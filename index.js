@@ -17,14 +17,14 @@ let activeConnections = new Set()
 let userHash_socketId = {}
 
 
-io.on("connection", function(socket){
+io.on("connection", function (socket) {
     console.log(`connected id: ${socket.id}`)
     //Login
-    socket.on('user-info', function(data){
-        console.log(data)
+    socket.on('user-info', function (data) {
+        console.log('DATA', data)
         // let hash = crypto.createHash('md5').update(data).digest("hex")
         activeConnections.add(socket.id)
-        userHash_socketId = {...userHash_socketId, [data]:socket.id}
+        userHash_socketId = { ...userHash_socketId, [data]: socket.id }
         io.to(socket.id).emit('confirm', 'successful connection...')
     })
 
@@ -35,37 +35,56 @@ io.on("connection", function(socket){
         activeConnections.delete(socket.id)
     });
 
-    socket.on('user-search',(data) =>{
-            Users.searchUser(data).then(users =>{
-                io.to(socket.id).emit('user-search', users)
-            })
-            .catch(error=>{
+    socket.on('user-search', (data) => {
+        Users.searchUser(data).then(users => {
+            io.to(socket.id).emit('user-search', users)
+        })
+            .catch(error => {
                 console.log(error)
-                io.to(socket.id).emit('user-search','error')
+                io.to(socket.id).emit('user-search', 'error')
             })
     })
 
     //Send message
-    socket.on('private', function(data){
+    socket.on('private', function (data) {
         console.log(data)
-        if(data.message && data.username && data.receiver_username && data.date ){
-            console.log({userOne:data.username,userTwo:data.receiver_username})
-            Connections.checkFriendship(data.username,data.receiver_username).then(user=>{
-                if(user.length !==0){
-                    Messages.sendMessage({from:data.username,to:data.receiver_username,message:data.message, date:data.date}).then(messages=>{
+        if (data.message && data.username && data.receiver_username && data.date) {
+            console.log({ userOne: data.username, userTwo: data.receiver_username })
+            Connections.checkFriendship(data.username, data.receiver_username).then(user => {
+                if (user.length !== 0) {
+                    Messages.sendMessage({ from: data.username, to: data.receiver_username, message: data.message, date: data.date }).then(messages => {
                         console.log(messages)
                     })
-                    .catch(error=>{
+                        .catch(error => {
                             console.log(error)
-                    })
-                    io.to(userHash_socketId[data.receiver_username]).emit('private', {username:data.username, message:data.message})
+                        })
+                    io.to(userHash_socketId[data.receiver_username]).emit('private', { username: data.username, message: data.message })
                 }
             })
-        }else{
-            io.to(socket.id).emit('error','failed to send message')
-    }
-  })
+        } else {
+            io.to(socket.id).emit('error', 'failed to send message')
+        }
+    })
+
+
+
+    socket.on('base64 file', function (msg) {
+        console.log('received base64 file from' + msg.username);
+        socket.username = msg.username;
+        socket.broadcast.emit('base64 image') //exclude sender
+        io.sockets.emit('base64 file',  //include sender
+            {
+                username: socket.username,
+                file: msg.file,
+                fileName: msg.fileName
+            }
+
+        );
+    });
 })
+
+
+
 
 app.listen(port, () => console.log(`Server running on port ${port}`))
 
